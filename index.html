@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>主体的学習促進アプリ</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: sans-serif;
+      margin: 1rem;
+      display: flex;
+      justify-content: center;
+    }
+    .container { width: 800px; }
+    section { margin-bottom: 2rem; }
+    textarea, input, select, button {
+      font-size: 1rem;
+      padding: 0.5rem;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      vertical-align: top;
+    }
+    textarea.schedule-text {
+      width: 100%;
+      height: 3rem;
+      resize: vertical;
+    }
+    .entry {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+    .entry input[type="text"] { flex: 2; }
+    .entry input[type="number"] { flex: 1; }
+    .post, .memo-item, .saved-item {
+      border: 1px solid #ccc;
+      padding: 0.5rem;
+      margin-top: 1rem;
+      border-radius: 8px;
+      position: relative;
+    }
+    .delete-btn {
+      position: absolute;
+      top: 5px;
+      right: 10px;
+      cursor: pointer;
+      color: red;
+    }
+    h2 { margin-top: 2rem; color: #2c3e50; }
+    .sns-buttons {
+      margin-top: 0.5rem;
+    }
+    .sns-buttons a {
+      margin-right: 0.5rem;
+      text-decoration: none;
+      color: white;
+      background: #1da1f2;
+      padding: 0.3rem 0.6rem;
+      border-radius: 5px;
+      font-size: 0.9rem;
+    }
+    .sns-buttons a.line { background: #00b900; }
+    .sns-buttons a.fb { background: #3b5998; }
+
+    /* ストップウォッチのスタイル */
+    .stopwatch {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .stopwatch-time {
+      font-size: 1.5rem;
+      width: 120px;
+      text-align: center;
+      font-weight: bold;
+    }
+
+    /* コピー完了メッセージ */
+    .copy-message {
+      color: green;
+      font-size: 0.9rem;
+      display: none;
+      margin-top: 0.3rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+  <h1>主体的学修促進アプリ</h1>
+
+  <section>
+    <h2>目標を設定しよう</h2>
+    <textarea id="memoInput" placeholder="例：『卒論のヒントを探す』『TOEICで700点を取る』などあなたの学修の目標を立てよう"></textarea>
+    <div id="memoList"></div>
+  </section>
+
+  <section>
+    <h2>学修の計画を立てよう</h2>
+    <h3>① 目標に対しての現在地を記述</h3>
+    <textarea rows="4" id="currentStatus" placeholder="自分が今どの段階かを書いてみましょう"></textarea>
+    <h3>② 学修のスケジュールを立てる</h3>
+    <table>
+      <thead>
+        <tr><th>日付</th><th>学習内容</th><th>方法・ツール</th></tr>
+      </thead>
+      <tbody id="schedule-table">
+        <tr>
+          <td><input type="date" value=""></td>
+          <td><textarea class="schedule-text" placeholder="例：論文を調べる"></textarea></td>
+          <td><textarea class="schedule-text" placeholder="例：メモ帳＋翻訳サイト"></textarea></td>
+        </tr>
+      </tbody>
+    </table>
+    <button onclick="addScheduleRow()">＋ 行を追加</button>
+  </section>
+
+  <section>
+    <h2>困ったときのサポートツール</h2>
+    <select id="problemSelect">
+      <option value="">選択してください</option>
+      <option value="kanji">漢字が読めない</option>
+      <option value="english">英語のサイトが読めない</option>
+      <option value="math">数式の計算をしたい</option>
+      <option value="paper">論文を探したい</option>
+    </select>
+    <div id="toolBox"></div>
+  </section>
+
+  <section>
+    <h2>ストップウォッチ（学習時間の目安に）</h2>
+    <div class="stopwatch">
+      <div id="timeDisplay" class="stopwatch-time">00:00:00</div>
+      <button onclick="startStopwatch()">▶ スタート</button>
+      <button onclick="stopStopwatch()">⏸ ストップ</button>
+      <button onclick="resetStopwatch()">🔁 リセット</button>
+    </div>
+  </section>
+
+  <section>
+    <h2>今日の学びを振り返ろう</h2>
+    <div id="entries">
+      <div class="entry">
+        <input type="text" placeholder="項目名" />
+        <input type="number" min="0" value="0" /> 時間
+      </div>
+    </div>
+    <button onclick="addEntry()">＋ 項目を追加</button>
+    <button onclick="updateChart()">グラフに反映</button>
+    <canvas id="studyChart" style="max-width: 100%; height: auto;"></canvas>
+  </section>
+
+  <section>
+    <h2>あなたの考えを共有しよう</h2>
+    <textarea id="postInput" placeholder="学修した内容や考察を共有して新たな知見を得よう"></textarea>
+    <button onclick="copyPost()">コピーする</button>
+    <div class="copy-message" id="copyMessage">コピーしました！</div>
+    <div id="postList"></div>
+    <div class="sns-buttons">
+      <a href="https://twitter.com/intent/tweet?text=" target="_blank">X</a>
+      <a href="https://social-plugins.line.me/lineit/share?url=https://example.com" target="_blank" class="line">LINE</a>
+      <a href="https://discord.com/channels/@me" target="_blank" style="background:#5865F2;">Discord</a>
+      <a href="https://www.facebook.com/sharer/sharer.php?u=https://example.com" target="_blank" class="fb">Facebook</a>
+    </div>
+  </section>
+
+  <button onclick="saveAll()"> 全項目を保存する</button>
+  <h2>保存した内容</h2>
+  <div id="savedList"></div>
+
+  </div>
+
+  <script>
+    // ユニークカラー生成
+    function getUniqueColors(n) {
+      const baseColors = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
+      let colors = [];
+      for (let i = 0; i < n; i++) {
+        colors.push(baseColors[i % baseColors.length]);
+      }
+      return colors;
+    }
+
+    // 計画
+    function addScheduleRow() {
+      const today = new Date().toISOString().split("T")[0];
+      const table = document.getElementById('schedule-table');
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="date" value="${today}"></td>
+        <td><textarea class="schedule-text" placeholder="学習内容"></textarea></td>
+        <td><textarea class="schedule-text" placeholder="方法・ツール"></textarea></td>
+      `;
+      table.appendChild(row);
+    }
+    document.querySelector("#schedule-table input[type='date']").value = new Date().toISOString().split("T")[0];
+
+    // 選択
+    const toolBox = document.getElementById("toolBox");
+    document.getElementById("problemSelect").addEventListener("change", function () {
+      const value = this.value;
+      if (value === "kanji") {
+        toolBox.innerHTML = '<ul><li><a href="https://mojinavi.com/tegaki" target="_blank">漢字手書き検索</a></li></ul>';
+      } else if (value === "english") {
+        toolBox.innerHTML = '<ul><li><a href="https://translate.google.com/" target="_blank">Google 翻訳</a></li><li><a href="https://deepl.com/" target="_blank">DeepL 翻訳</a></li></ul>';
+      } else if (value === "math") {
+        toolBox.innerHTML = '<ul><li><a href="https://ja.wolframalpha.com/" target="_blank">WolframAlpha</a></li></ul>';
+      } else if (value === "paper") {
+        toolBox.innerHTML = '<ul><li><a href="https://www.jstage.jst.go.jp/browse/-char/ja" target="_blank">J-STAGE</a></li><li><a href="https://cir.nii.ac.jp/" target="_blank">CiNii Research</a></li></ul>';
+      } else {
+        toolBox.innerHTML = "";
+      }
+    });
+
+    // ストップウォッチ
+    let startTime, timerInterval;
+    function updateStopwatch() {
+      const elapsed = new Date(Date.now() - startTime);
+      const h = String(elapsed.getUTCHours()).padStart(2, "0");
+      const m = String(elapsed.getUTCMinutes()).padStart(2, "0");
+      const s = String(elapsed.getUTCSeconds()).padStart(2, "0");
+      document.getElementById("timeDisplay").textContent = `${h}:${m}:${s}`;
+    }
+    function startStopwatch() {
+      if (!timerInterval) {
+        startTime = Date.now();
+        timerInterval = setInterval(updateStopwatch, 1000);
+      }
+    }
+    function stopStopwatch() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+    }
+    function resetStopwatch() {
+      stopStopwatch();
+      document.getElementById("timeDisplay").textContent = "00:00:00";
+    }
+
+    // 調整
+    const ctx = document.getElementById("studyChart").getContext("2d");
+    const chart = new Chart(ctx, {
+      type: "bar",
+      data: { labels: [], datasets: [{ label: "学習時間（時間）", data: [], backgroundColor: [] }] },
+      options: { responsive: true, scales: { y: { beginAtZero: true } } }
+    });
+    function addEntry() {
+      const div = document.createElement("div");
+      div.className = "entry";
+      div.innerHTML = '<input type="text" placeholder="項目名" /><input type="number" min="0" value="0" /> 時間';
+      document.getElementById("entries").appendChild(div);
+    }
+    function updateChart() {
+      const entries = document.querySelectorAll("#entries .entry");
+      const labels = [], data = [];
+      entries.forEach(entry => {
+        const name = entry.querySelector("input[type='text']").value.trim();
+        const time = Number(entry.querySelector("input[type='number']").value);
+        if (name && !isNaN(time)) {
+          labels.push(name);
+          data.push(time);
+        }
+      });
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = data;
+      chart.data.datasets[0].backgroundColor = getUniqueColors(labels.length);
+      chart.update();
+    }
+
+    // コピー機能（追加）
+    function copyPost() {
+      const text = document.getElementById("postInput").value;
+      navigator.clipboard.writeText(text).then(() => {
+        const msg = document.getElementById("copyMessage");
+        msg.style.display = "block";
+        setTimeout(() => msg.style.display = "none", 2000);
+      });
+    }
+
+    // 保存
+    function saveAll() {
+      const today = new Date().toLocaleString();
+      const memo = document.getElementById("memoInput").value.trim();
+      const current = document.getElementById("currentStatus").value.trim();
+      const schedules = Array.from(document.querySelectorAll("#schedule-table tr")).map(tr =>
+        Array.from(tr.querySelectorAll("input, textarea")).map(input => input.value)
+      );
+      const entries = Array.from(document.querySelectorAll("#entries .entry")).map(e => ({
+        name: e.querySelector("input[type='text']").value,
+        time: e.querySelector("input[type='number']").value
+      }));
+      const post = document.getElementById("postInput").value.trim();
+
+      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+      saved.unshift({ date: today, memo, current, schedules, entries, post });
+      localStorage.setItem("savedAll", JSON.stringify(saved));
+      loadSaved();
+    }
+
+    function deleteSaved(index) {
+      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+      saved.splice(index, 1);
+      localStorage.setItem("savedAll", JSON.stringify(saved));
+      loadSaved();
+    }
+
+    function loadSaved() {
+      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+      const savedList = document.getElementById("savedList");
+      savedList.innerHTML = "";
+      saved.forEach((item, i) => {
+        const div = document.createElement("div");
+        div.className = "saved-item";
+        div.innerHTML = `
+          <span class="delete-btn" onclick="deleteSaved(${i})">✖</span>
+          <b>保存日時:</b> ${item.date}<br>
+          <b>目標:</b> ${item.memo}<br>
+          <b>現在地:</b> ${item.current}<br>
+          <b>スケジュール:</b> ${item.schedules.map(s => s.join(" / ")).join(", ")}<br>
+          <b>学習時間:</b> ${item.entries.map(e => e.name + ":" + e.time + "h").join(", ")}<br>
+          <b>投稿:</b> ${item.post}
+        `;
+        savedList.appendChild(div);
+      });
+    }
+
+    window.onload = loadSaved;
+  </script>
+</body>
+</html>
