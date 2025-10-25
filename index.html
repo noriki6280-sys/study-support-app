@@ -191,8 +191,8 @@ window.onload = function () {
     return Array.from({ length: n }, (_, i) => baseColors[i % baseColors.length]);
   }
 
-  // 計画
-  function addScheduleRow() {
+  // 計画（行追加機能の修正版）
+  window.addScheduleRow = function () {
     const today = new Date().toISOString().split("T")[0];
     const table = document.getElementById('schedule-table');
     const row = document.createElement('tr');
@@ -203,7 +203,8 @@ window.onload = function () {
     `;
     table.appendChild(row);
     autoSave();
-  }
+  };
+
 
   // 初期日付設定
   const dateInput = document.querySelector("#schedule-table input[type='date']");
