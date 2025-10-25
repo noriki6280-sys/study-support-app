@@ -104,7 +104,7 @@
 
   <section>
     <h2>目標を設定しよう</h2>
-    <textarea id="memoInput" placeholder="例：『卒論のヒントを探す』『TOEICで700点を取る』などあなたの学修の目標を立てよう"></textarea>
+    <textarea id="memoInput" placeholder="例：『卒論のヒントを探す』など"></textarea>
     <div id="memoList"></div>
   </section>
 
@@ -165,7 +165,7 @@
 
   <section>
     <h2>あなたの考えを共有しよう</h2>
-    <textarea id="postInput" placeholder="学修した内容や考察を共有して新たな知見を得よう"></textarea>
+    <textarea id="postInput" placeholder="例：『自立した学修者に必要な力とは何か？』など"></textarea>
     <button onclick="copyPost()">コピーする</button>
     <div class="copy-message" id="copyMessage">コピーしました！</div>
     <div id="postList"></div>
@@ -184,33 +184,37 @@
   </div>
 
   <script>
-    // ユニークカラー生成
-    function getUniqueColors(n) {
-      const baseColors = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
-      let colors = [];
-      for (let i = 0; i < n; i++) {
-        colors.push(baseColors[i % baseColors.length]);
-      }
-      return colors;
-    }
+window.onload = function () {
+  // ユニークカラー生成
+  function getUniqueColors(n) {
+    const baseColors = ["#4e79a7", "#f28e2b", "#e15759", "#76b7b2", "#59a14f", "#edc948"];
+    return Array.from({ length: n }, (_, i) => baseColors[i % baseColors.length]);
+  }
 
-    // 計画
-    function addScheduleRow() {
-      const today = new Date().toISOString().split("T")[0];
-      const table = document.getElementById('schedule-table');
-      const row = document.createElement('tr');
-      row.innerHTML = `
-        <td><input type="date" value="${today}"></td>
-        <td><textarea class="schedule-text" placeholder="学習内容"></textarea></td>
-        <td><textarea class="schedule-text" placeholder="方法・ツール"></textarea></td>
-      `;
-      table.appendChild(row);
-    }
-    document.querySelector("#schedule-table input[type='date']").value = new Date().toISOString().split("T")[0];
+  // 計画
+  function addScheduleRow() {
+    const today = new Date().toISOString().split("T")[0];
+    const table = document.getElementById('schedule-table');
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="date" value="${today}"></td>
+      <td><textarea class="schedule-text" placeholder="学習内容"></textarea></td>
+      <td><textarea class="schedule-text" placeholder="方法・ツール"></textarea></td>
+    `;
+    table.appendChild(row);
+    autoSave();
+  }
 
-    // 選択
-    const toolBox = document.getElementById("toolBox");
-    document.getElementById("problemSelect").addEventListener("change", function () {
+  // 初期日付設定
+  const dateInput = document.querySelector("#schedule-table input[type='date']");
+  if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
+
+  // 選択
+  const problemSelect = document.getElementById("problemSelect");
+  const toolBox = document.getElementById("toolBox");
+
+  if (problemSelect) {
+    problemSelect.addEventListener("change", function () {
       const value = this.value;
       if (value === "kanji") {
         toolBox.innerHTML = '<ul><li><a href="https://mojinavi.com/tegaki" target="_blank">漢字手書き検索</a></li></ul>';
@@ -223,120 +227,155 @@
       } else {
         toolBox.innerHTML = "";
       }
+      autoSave();
     });
+  }
 
-    // ストップウォッチ
-    let startTime, timerInterval;
-    function updateStopwatch() {
-      const elapsed = new Date(Date.now() - startTime);
-      const h = String(elapsed.getUTCHours()).padStart(2, "0");
-      const m = String(elapsed.getUTCMinutes()).padStart(2, "0");
-      const s = String(elapsed.getUTCSeconds()).padStart(2, "0");
-      document.getElementById("timeDisplay").textContent = `${h}:${m}:${s}`;
+  // ストップウォッチ
+  let startTime, timerInterval;
+  function updateStopwatch() {
+    const elapsed = new Date(Date.now() - startTime);
+    const h = String(elapsed.getUTCHours()).padStart(2, "0");
+    const m = String(elapsed.getUTCMinutes()).padStart(2, "0");
+    const s = String(elapsed.getUTCSeconds()).padStart(2, "0");
+    document.getElementById("timeDisplay").textContent = `${h}:${m}:${s}`;
+  }
+  window.startStopwatch = function () {
+    if (!timerInterval) {
+      startTime = Date.now();
+      timerInterval = setInterval(updateStopwatch, 1000);
     }
-    function startStopwatch() {
-      if (!timerInterval) {
-        startTime = Date.now();
-        timerInterval = setInterval(updateStopwatch, 1000);
+  };
+  window.stopStopwatch = function () {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  };
+  window.resetStopwatch = function () {
+    stopStopwatch();
+    document.getElementById("timeDisplay").textContent = "00:00:00";
+  };
+
+  // 調整（グラフ）
+  const ctx = document.getElementById("studyChart").getContext("2d");
+  const chart = new Chart(ctx, {
+    type: "bar",
+    data: { labels: [], datasets: [{ label: "学習時間（時間）", data: [], backgroundColor: [] }] },
+    options: { responsive: true, scales: { y: { beginAtZero: true } } }
+  });
+
+  window.addEntry = function () {
+    const div = document.createElement("div");
+    div.className = "entry";
+    div.innerHTML = '<input type="text" placeholder="項目名" /><input type="number" min="0" value="0" /> 時間';
+    document.getElementById("entries").appendChild(div);
+    autoSave();
+  };
+
+  window.updateChart = function () {
+    const entries = document.querySelectorAll("#entries .entry");
+    const labels = [], data = [];
+    entries.forEach(entry => {
+      const name = entry.querySelector("input[type='text']").value.trim();
+      const time = Number(entry.querySelector("input[type='number']").value);
+      if (name && !isNaN(time)) {
+        labels.push(name);
+        data.push(time);
       }
-    }
-    function stopStopwatch() {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    function resetStopwatch() {
-      stopStopwatch();
-      document.getElementById("timeDisplay").textContent = "00:00:00";
-    }
-
-    // 調整
-    const ctx = document.getElementById("studyChart").getContext("2d");
-    const chart = new Chart(ctx, {
-      type: "bar",
-      data: { labels: [], datasets: [{ label: "学習時間（時間）", data: [], backgroundColor: [] }] },
-      options: { responsive: true, scales: { y: { beginAtZero: true } } }
     });
-    function addEntry() {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = data;
+    chart.data.datasets[0].backgroundColor = getUniqueColors(labels.length);
+    chart.update();
+    autoSave();
+  };
+
+  // 協働（コピー）
+  window.copyPost = function () {
+    const text = document.getElementById("postInput").value;
+    navigator.clipboard.writeText(text).then(() => {
+      const msg = document.getElementById("copyMessage");
+      msg.style.display = "block";
+      setTimeout(() => (msg.style.display = "none"), 2000);
+    });
+  };
+
+  // 保存機能
+  function saveAll() {
+    const today = new Date().toLocaleString();
+    const memo = document.getElementById("memoInput").value.trim();
+    const current = document.getElementById("currentStatus").value.trim();
+    const schedules = Array.from(document.querySelectorAll("#schedule-table tr")).map(tr =>
+      Array.from(tr.querySelectorAll("input, textarea")).map(input => input.value)
+    );
+    const entries = Array.from(document.querySelectorAll("#entries .entry")).map(e => ({
+      name: e.querySelector("input[type='text']").value,
+      time: e.querySelector("input[type='number']").value
+    }));
+    const post = document.getElementById("postInput").value.trim();
+
+    const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+    saved.unshift({ date: today, memo, current, schedules, entries, post });
+    localStorage.setItem("savedAll", JSON.stringify(saved));
+    loadSaved();
+  }
+  window.saveAll = saveAll;
+
+  window.deleteSaved = function (index) {
+    const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+    saved.splice(index, 1);
+    localStorage.setItem("savedAll", JSON.stringify(saved));
+    loadSaved();
+  };
+
+  function loadSaved() {
+    const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
+    const savedList = document.getElementById("savedList");
+    savedList.innerHTML = "";
+    saved.forEach((item, i) => {
       const div = document.createElement("div");
-      div.className = "entry";
-      div.innerHTML = '<input type="text" placeholder="項目名" /><input type="number" min="0" value="0" /> 時間';
-      document.getElementById("entries").appendChild(div);
-    }
-    function updateChart() {
-      const entries = document.querySelectorAll("#entries .entry");
-      const labels = [], data = [];
-      entries.forEach(entry => {
-        const name = entry.querySelector("input[type='text']").value.trim();
-        const time = Number(entry.querySelector("input[type='number']").value);
-        if (name && !isNaN(time)) {
-          labels.push(name);
-          data.push(time);
-        }
-      });
-      chart.data.labels = labels;
-      chart.data.datasets[0].data = data;
-      chart.data.datasets[0].backgroundColor = getUniqueColors(labels.length);
-      chart.update();
-    }
+      div.className = "saved-item";
+      div.innerHTML = `
+        <span class="delete-btn" onclick="deleteSaved(${i})">✖</span>
+        <b>保存日時:</b> ${item.date}<br>
+        <b>目標:</b> ${item.memo}<br>
+        <b>現在地:</b> ${item.current}<br>
+        <b>スケジュール:</b> ${item.schedules.map(s => s.join(" / ")).join(", ")}<br>
+        <b>学習時間:</b> ${item.entries.map(e => e.name + ":" + e.time + "h").join(", ")}<br>
+        <b>投稿:</b> ${item.post}
+      `;
+      savedList.appendChild(div);
+    });
+  }
 
-    // コピー機能（追加）
-    function copyPost() {
-      const text = document.getElementById("postInput").value;
-      navigator.clipboard.writeText(text).then(() => {
-        const msg = document.getElementById("copyMessage");
-        msg.style.display = "block";
-        setTimeout(() => msg.style.display = "none", 2000);
-      });
-    }
+  // 🔹入力内容の自動保存
+  function autoSave() {
+    const data = {
+      memo: document.getElementById("memoInput").value,
+      current: document.getElementById("currentStatus").value,
+      post: document.getElementById("postInput").value,
+      problem: document.getElementById("problemSelect").value
+    };
+    localStorage.setItem("draftData", JSON.stringify(data));
+  }
 
-    // 保存
-    function saveAll() {
-      const today = new Date().toLocaleString();
-      const memo = document.getElementById("memoInput").value.trim();
-      const current = document.getElementById("currentStatus").value.trim();
-      const schedules = Array.from(document.querySelectorAll("#schedule-table tr")).map(tr =>
-        Array.from(tr.querySelectorAll("input, textarea")).map(input => input.value)
-      );
-      const entries = Array.from(document.querySelectorAll("#entries .entry")).map(e => ({
-        name: e.querySelector("input[type='text']").value,
-        time: e.querySelector("input[type='number']").value
-      }));
-      const post = document.getElementById("postInput").value.trim();
+  function loadAutoSaved() {
+    const data = JSON.parse(localStorage.getItem("draftData") || "{}");
+    if (data.memo) document.getElementById("memoInput").value = data.memo;
+    if (data.current) document.getElementById("currentStatus").value = data.current;
+    if (data.post) document.getElementById("postInput").value = data.post;
+    if (data.problem) document.getElementById("problemSelect").value = data.problem;
+  }
 
-      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
-      saved.unshift({ date: today, memo, current, schedules, entries, post });
-      localStorage.setItem("savedAll", JSON.stringify(saved));
-      loadSaved();
-    }
+  ["memoInput", "currentStatus", "postInput", "problemSelect"].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener("input", autoSave);
+  });
 
-    function deleteSaved(index) {
-      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
-      saved.splice(index, 1);
-      localStorage.setItem("savedAll", JSON.stringify(saved));
-      loadSaved();
-    }
+  // 初期読み込み
+  loadSaved();
+  loadAutoSaved();
+};
+</script>
 
-    function loadSaved() {
-      const saved = JSON.parse(localStorage.getItem("savedAll") || "[]");
-      const savedList = document.getElementById("savedList");
-      savedList.innerHTML = "";
-      saved.forEach((item, i) => {
-        const div = document.createElement("div");
-        div.className = "saved-item";
-        div.innerHTML = `
-          <span class="delete-btn" onclick="deleteSaved(${i})">✖</span>
-          <b>保存日時:</b> ${item.date}<br>
-          <b>目標:</b> ${item.memo}<br>
-          <b>現在地:</b> ${item.current}<br>
-          <b>スケジュール:</b> ${item.schedules.map(s => s.join(" / ")).join(", ")}<br>
-          <b>学習時間:</b> ${item.entries.map(e => e.name + ":" + e.time + "h").join(", ")}<br>
-          <b>投稿:</b> ${item.post}
-        `;
-        savedList.appendChild(div);
-      });
-    }
-
-    window.onload = loadSaved;
-  </script>
 </body>
 </html>
